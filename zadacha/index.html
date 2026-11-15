@@ -149,6 +149,7 @@ html,body{background-color:#fffef8;
 .nm input{font:inherit;font-weight:800;color:var(--ink);width:min(16vw,26vh);padding:.45em .7em;border-radius:.6em;border:3px solid var(--tc);background:var(--tl);outline:none;text-align:center;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 .nm input::placeholder{color:var(--tc);opacity:.75}
 .bh .sc{white-space:nowrap}
+.one4{display:none;background:#dff7ea;color:#169650;border:3px solid #93dcb4;border-radius:999px;padding:.5em 1.3em;font-weight:800;font-size:min(1.8vw,3vh)}
 </style>
 </head>
 <body>
@@ -167,6 +168,7 @@ html,body{background-color:#fffef8;
   </div>
   <div class="mode" id="mode"><span>Задачи для команд:</span><button class="tog on" data-same="1">Одинаковые</button><button class="tog" data-same="0">Разные</button></div>
   <button class="tog" id="extra">＋ Добавить ещё 2 задачи про кружки</button>
+  <div class="one4" id="one4">1 команда: 4 задачи — ученики выходят по очереди, у каждого своя задача</div>
   <div class="names" id="names"><span>Названия команд (можно не писать):</span><div class="nm" id="nmList"></div></div>
   <button class="big" id="start">Начать игру ▶</button>
   <button class="fsbtn" data-fs>⛶ На весь экран</button>
@@ -241,7 +243,7 @@ function onTap(el,fn){
 [].forEach.call(document.querySelectorAll('#tc button'),function(b){
   b.addEventListener('click',function(){
     [].forEach.call(document.querySelectorAll('#tc button'),function(x){x.classList.remove('on')});
-    b.classList.add('on'); nTeams=+b.getAttribute('data-n'); drawNameInputs();
+    b.classList.add('on'); nTeams=+b.getAttribute('data-n'); drawNameInputs(); updExtra();
     $('mode').style.visibility=nTeams>1?'visible':'hidden';
   });
 });
@@ -265,10 +267,11 @@ function drawNameInputs(){
     inp.addEventListener('input',function(){ customNames[+inp.getAttribute('data-k')]=inp.value; });
   });
 }
+function updExtra(){ var one=nTeams===1; $('extra').style.display=one?'none':''; $('one4').style.display=one?'inline-block':'none'; }
 function roundFor(b){ return (sameEx||nTeams===1)?rounds[ri]:rounds[(ri+b.t)%rounds.length]; }
 $('extra').addEventListener('click',function(){ useExtra=!useExtra; this.classList.toggle('on',useExtra); this.textContent=(useExtra?'✓ ':'＋ ')+'Добавить ещё 2 задачи про кружки'; });
 $('start').addEventListener('click',startGame);
-drawNameInputs();
+drawNameInputs(); updExtra();
 $('again').addEventListener('click',startGame);
 [].forEach.call(document.querySelectorAll('[data-fs]'),function(b){ b.addEventListener('click',toggleFS); });
 function toggleFS(){
@@ -284,7 +287,8 @@ $('skip').addEventListener('click',nextRound);
 $('ovBtn').addEventListener('click',nextRound);
 
 function startGame(){
-  rounds=useExtra?P_MAIN.concat(P_EXTRA):P_MAIN.slice();
+  /* 1 команда: всегда 4 задачи — ученики выходят по очереди, у каждого своя задача */
+  rounds=(useExtra||nTeams===1)?P_MAIN.concat(P_EXTRA):P_MAIN.slice();
   ri=0; boards=[];
   var box=$('boards'); box.innerHTML=''; box.className='n'+nTeams;
   for(var t=0;t<nTeams;t++) boards.push(makeBoard(t));
