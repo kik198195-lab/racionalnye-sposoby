@@ -154,6 +154,18 @@ html,body{background-color:#fffef8;
 .nm input{font:inherit;font-weight:800;color:var(--ink);width:min(16vw,26vh);padding:.45em .7em;border-radius:.6em;border:3px solid var(--tc);background:var(--tl);outline:none;text-align:center;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 .nm input::placeholder{color:var(--tc);opacity:.75}
 .bh .sc{white-space:nowrap}
+/* запись — одна строка, числа немного ниже середины */
+.task{display:block!important;white-space:nowrap;overflow:hidden;text-align:center;min-height:0!important;font-size:1.45em;padding:.35em .6em .25em!important}
+.task .rl{vertical-align:.15em}
+.row{margin-top:.75em!important}
+#boards.n1 .row,#boards.n2 .row{margin-top:1.3em!important}
+.bt{white-space:nowrap}
+.tb.nx.ready{background:#169650;box-shadow:0 .5vh 0 #0e6b3a}
+.msg.solved{font-size:1.15em}
+.copy{font-size:1.75em;font-weight:900;color:var(--ink);line-height:1.35;margin:.15em .3em .1em;text-align:center}
+.copy span{white-space:nowrap}
+.copy span:last-child{color:#b06d00}
+.steps{font-size:1.5em;font-weight:900;color:var(--ink);margin:.05em 0 .15em}
 </style>
 </head>
 <body>
@@ -322,14 +334,15 @@ function startRound(){
   finishOrder=[];
   var r=rounds[ri], diff=!(sameEx||nTeams===1);
   $('rt').textContent='Пример '+(ri+1)+' из '+rounds.length+'  ·  '+(diff?'у каждой команды свой пример':r.src);
+  $('skip').classList.remove('ready');
   $('skip').textContent= ri<rounds.length-1 ? 'Следующий пример ▶' : 'Итоги ▶';
   boards.forEach(initBoard);
-  requestAnimationFrame(fitAll);
+  requestAnimationFrame(fitAll); setTimeout(fitAll,250); setTimeout(fitAll,700);
 }
 function initBoard(b){
   var r=b.r=roundFor(b);
   b.items=r.terms.map(function(v,k){ return {id:'t'+k, v:v}; });
-  b.groups=[]; b.sel=null; b.phase='build'; b.mist=0; b.mc=0; b.chain=[r.show];
+  b.groups=[]; b.sel=null; b.phase='build'; b.solvedG={}; b.stepsHtml=''; b.mist=0; b.mc=0; b.chain=[r.show];
   b.el.classList.remove('fin');
   b.task.innerHTML='';
   b.bb.style.visibility='visible';
@@ -346,9 +359,10 @@ function fitBoard(b){
   var w=b.el.clientWidth, h=b.el.clientHeight; if(!w) return;
   var f=Math.max(11,Math.min(w/30,h/16)), g=0;
   b.el.style.fontSize=f+'px';
+  fitRec(b);
   for(var id in b.tiles) b.tiles[id]._placed=false;
   layout(b);
-  while(b.el.scrollHeight>b.el.clientHeight+1 && f>9 && g++<30){ f*=0.95; b.el.style.fontSize=f+'px'; layout(b); }
+  while(b.el.scrollHeight>b.el.clientHeight+1 && f>9 && g++<30){ f*=0.95; b.el.style.fontSize=f+'px'; fitRec(b); layout(b); }
 }
 window.addEventListener('resize',function(){ if($('game').classList.contains('on')) fitAll(); });
 
@@ -403,6 +417,12 @@ function updRec(b){
   var h='<span class="rl">Запись</span>';
   segs.forEach(function(s,i){ if(i) h+='<span class="eqs">=</span>'; h+='<span class="rs '+s.c+'">'+s.t+'</span>'; });
   b.task.innerHTML=h;
+  fitRec(b);
+}
+function fitRec(b){
+  var el=b.task; el.style.fontSize='';
+  var f=parseFloat(getComputedStyle(el).fontSize), g=0;
+  while(el.scrollWidth>el.clientWidth+1 && f>8 && g++<40){ f*=0.95; el.style.fontSize=f+'px'; }
 }
 function layout(b){
   var row=b.row, W=row.clientWidth; if(!W) return;
@@ -516,7 +536,7 @@ function makeOpts(c){
 }
 function ask(b,q,ans,onOk){
   var os=makeOpts(ans);
-  setInfo(b,'<div class="q">'+q+' = ?</div><div class="opts">'+os.map(function(o){return '<button class="opt" data-v="'+o+'">'+o+'</button>';}).join('')+'</div><div class="msg"></div>');
+  setInfo(b,(b.stepsHtml||'')+'<div class="q">'+q+' = ?</div><div class="opts">'+os.map(function(o){return '<button class="opt" data-v="'+o+'">'+o+'</button>';}).join('')+'</div><div class="msg"></div>');
   [].forEach.call(b.info.querySelectorAll('.opt'),function(btn){
     onTap(btn,function(){
       if(btn.classList.contains('no')) return;
@@ -525,20 +545,41 @@ function ask(b,q,ans,onOk){
     });
   });
 }
+/* шаг решения строкой: решённые скобки заменены числом, остальные — как есть */
+function stepText(b){
+  var s='', first=true;
+  b.items.forEach(function(it){
+    if(it.res) return;
+    var gi=groupOf(b,it.id), g=gi>=0?b.groups[gi]:null;
+    if(g && g[1]===it.id) return;
+    var v, txt;
+    if(g){
+      var a=val(b,g[0]), c=val(b,g[1]);
+      if(b.solvedG && b.solvedG[g[0]]!==undefined){ v=a+c; txt=fmt(v); }
+      else { v=a; txt='('+fmt(a)+(c<0?' − ':' + ')+fmt(c)+')'; }
+    } else { v=it.v; txt=fmt(it.v); }
+    s+= first ? (v<0?'−':'')+txt : (v<0?' − ':' + ')+txt;
+    first=false;
+  });
+  return s;
+}
 function nextCalc(b){
-  if(!b.groups.length){ return finalStep(b); }
-  var g=b.groups[0], a=val(b,g[0]), c=val(b,g[1]);
+  b.solvedG=b.solvedG||{};
+  var g=null;
+  for(var i=0;i<b.groups.length;i++){ if(b.solvedG[b.groups[i][0]]===undefined){ g=b.groups[i]; break; } }
+  var any=Object.keys(b.solvedG).length>0;
+  b.stepsHtml= any ? '<div class="steps">= '+stepText(b)+'</div>' : '';
+  if(!g){ b.stepsHtml=''; return finalStep(b); }
+  var a=val(b,g[0]), c=val(b,g[1]);
   var q=fmt(a)+(c<0?' − ':' + ')+fmt(c);
   ask(b,'Сколько в скобках: '+q,a+c,function(){
-    var i=idx(b,g[0]);
-    b.items.splice(i,2,{id:'m'+(b.mc++), v:a+c, mg:true});
-    b.groups.shift(); render(b);
+    b.solvedG[g[0]]=a+c;
     nextCalc(b);
   });
 }
 function finalStep(b){
   var sum=0; b.items.forEach(function(it){ sum+=it.v; });
-  var q=rowText(b,false);
+  var q=stepText(b);
   b.chain.push(q); updRec(b);
   ask(b,q,sum,function(){
     b.chain.push(String(sum)); b.phase='done';
@@ -552,14 +593,14 @@ function finish(b){
   b.phase='done'; finishOrder.push(b); sWin();
   b.last=2; b.score+=2;
   b.sc.textContent=pts(b.score);
-  setTimeout(function(){
-    b.done.innerHTML='<div class="h">Готово!</div><div class="st">+2 балла</div>'+
-      (nTeams>1?'<div class="bo">'+(finishOrder.indexOf(b)+1)+'-е место</div>':'')+
-      '<div class="ch">'+b.chain.join(' = ')+'</div>';
-    b.el.classList.add('fin');
-  },900);
+  /* solvedNote: доску не закрываем — запись и ответ остаются, дети переписывают */
+  var place=finishOrder.indexOf(b)+1;
+  b.info.innerHTML='<div class="msg good solved">✓ Готово! +2 балла'+(nTeams>1?' · '+place+'-е место':'')+'</div>'+
+    '<div class="copy">'+b.chain.map(function(s){return '<span>'+s+'</span>';}).join(' = ')+'</div>'+'<div class="ins">Перепишите пример в тетрадь</div>';
+  fitBoard(b);
   if(finishOrder.length===boards.length){
-    ovTimer=setTimeout(showRoundResult,2600);
+    var sk=$('skip'); sk.classList.add('ready');
+    sk.textContent=(boards.length>1?'Все готовы — ':'')+(ri<rounds.length-1?'Следующий пример ▶':'Итоги ▶');
   }
 }
 function showRoundResult(){
