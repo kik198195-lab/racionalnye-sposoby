@@ -149,6 +149,11 @@ html,body{background-color:#fffef8;
 #setup .fsbtn{position:absolute;top:2vh;right:5vw;margin:0;z-index:3}
 #setup{padding-top:1vh;padding-bottom:6vh}
 #setup .how div{font-size:min(1.5vw,2.5vh)}
+.names{display:flex;flex-direction:column;align-items:center;gap:1vh;margin:1.6vh 0;font-weight:800;color:var(--muted);font-size:min(1.7vw,2.9vh)}
+.nm{display:flex;gap:1.2vw;flex-wrap:wrap;justify-content:center}
+.nm input{font:inherit;font-weight:800;color:var(--ink);width:min(16vw,26vh);padding:.45em .7em;border-radius:.6em;border:3px solid var(--tc);background:var(--tl);outline:none;text-align:center;touch-action:manipulation;-webkit-user-select:text;user-select:text}
+.nm input::placeholder{color:var(--tc);opacity:.75}
+.bh .sc{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -167,10 +172,7 @@ html,body{background-color:#fffef8;
   </div>
   <div class="mode" id="mode"><span>Примеры для команд:</span><button class="tog on" data-same="1">Одинаковые</button><button class="tog" data-same="0">Разные</button></div>
   <button class="tog" id="extra">＋ Добавить примеры из № 6</button>
-  <div class="how">
-    <div><b>✋</b>Перетащи числа пальцем, чтобы удобные стояли рядом</div>
-    <div><b>( )</b>Нажми на два соседних числа — появятся скобки</div>
-    <div><b>✓</b>Нажми «Проверить» и посчитай</div>
+  <div class="names" id="names"><span>Названия команд (можно не писать):</span><div class="nm" id="nmList"></div></div>
   </div>
   <button class="big" id="start">Начать игру ▶</button>
   <button class="fsbtn" data-fs>⛶ На весь экран</button>
@@ -212,10 +214,10 @@ var R_EXTRA=[
   {src:'№ 6', show:'34 + 66 − 16',       terms:[34,66,-16],    pairs:[[34,66]]}
 ];
 var TEAMS=[
-  {n:'Красные',  c:'#e8434f', l:'#ffe8ea'},
-  {n:'Синие',    c:'#2f6fe0', l:'#e5eeff'},
-  {n:'Зелёные',  c:'#18995a', l:'#e0f6ea'},
-  {n:'Оранжевые',c:'#ec8411', l:'#fff0dc'}
+  {n:'Команда 1', c:'#e8434f', l:'#ffe8ea'},
+  {n:'Команда 2', c:'#2f6fe0', l:'#e5eeff'},
+  {n:'Команда 3', c:'#18995a', l:'#e0f6ea'},
+  {n:'Команда 4', c:'#ec8411', l:'#fff0dc'}
 ];
 
 var $=function(id){return document.getElementById(id)};
@@ -250,6 +252,7 @@ function onTap(el,fn){
     [].forEach.call(document.querySelectorAll('#tc button'),function(x){x.classList.remove('on')});
     b.classList.add('on'); nTeams=+b.getAttribute('data-n');
     $('mode').style.visibility=nTeams>1?'visible':'hidden';
+    drawNameInputs();
   });
 });
 [].forEach.call(document.querySelectorAll('#mode .tog'),function(b){
@@ -258,9 +261,23 @@ function onTap(el,fn){
     b.classList.add('on'); sameEx=b.getAttribute('data-same')==='1';
   });
 });
+var customNames=['','','',''];
+function teamName(t){ var s=(customNames[t]||'').trim(); return s?s:('Команда '+(t+1)); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function drawNameInputs(){
+  var box=$('nmList'); if(!box) return;
+  var html='';
+  for(var k=0;k<nTeams;k++){ var T=TEAMS[k];
+    html+='<input maxlength="18" data-k="'+k+'" style="--tc:'+T.c+';--tl:'+T.l+'" placeholder="Команда '+(k+1)+'" value="'+esc(customNames[k])+'">'; }
+  box.innerHTML=html;
+  [].forEach.call(box.querySelectorAll('input'),function(inp){
+    inp.addEventListener('input',function(){ customNames[+inp.getAttribute('data-k')]=inp.value; });
+  });
+}
 function roundFor(b){ return (sameEx||nTeams===1)?rounds[ri]:rounds[(ri+b.t)%rounds.length]; }
 $('extra').addEventListener('click',function(){ useExtra=!useExtra; this.classList.toggle('on',useExtra); this.textContent=(useExtra?'✓ ':'＋ ')+'Добавить примеры из № 6'; });
 $('start').addEventListener('click',startGame);
+drawNameInputs();
 $('again').addEventListener('click',startGame);
 [].forEach.call(document.querySelectorAll('[data-fs]'),function(b){ b.addEventListener('click',toggleFS); });
 function toggleFS(){
@@ -287,7 +304,7 @@ function startGame(){
 function makeBoard(t){
   var T=TEAMS[t], el=document.createElement('div');
   el.className='board'; el.style.setProperty('--tc',T.c); el.style.setProperty('--tl',T.l);
-  el.innerHTML='<div class="bh"><span><span class="dot"></span>'+T.n+'</span><span class="sc">⭐ 0</span></div>'+
+  el.innerHTML='<div class="bh"><span><span class="dot"></span>'+esc(teamName(t))+'</span><span class="sc">0 баллов</span></div>'+
     '<div class="task"></div><div class="row"></div><div class="info"></div>'+
     '<div class="bb"><button class="bt" data-a="reset">↺ Заново</button><button class="bt ck" data-a="check">✓ Проверить</button></div>'+
     '<div class="done"></div>';
@@ -530,14 +547,14 @@ function finalStep(b){
     finish(b);
   });
 }
+function pts(n){ var m=n%10, h=n%100; var w=(m===1&&h!==11)?'балл':(m>=2&&m<=4&&(h<12||h>14))?'балла':'баллов'; return n+' '+w; }
 function finish(b){
   b.phase='done'; finishOrder.push(b); sWin();
-  var stars=Math.max(1,3-b.mist), bonus=(finishOrder.length===1&&nTeams>1)?1:0;
-  b.last=stars+bonus; b.score+=b.last;
-  b.sc.textContent='⭐ '+b.score;
+  b.last=2; b.score+=2;
+  b.sc.textContent=pts(b.score);
   setTimeout(function(){
-    b.done.innerHTML='<div class="h">Готово!</div><div class="st">'+'⭐'.repeat(stars)+'</div>'+
-      (nTeams>1?'<div class="bo">'+(bonus?'🥇 Первые! +1':(finishOrder.indexOf(b)+1)+'-е место')+'</div>':'')+
+    b.done.innerHTML='<div class="h">Готово!</div><div class="st">+2 балла</div>'+
+      (nTeams>1?'<div class="bo">'+(finishOrder.indexOf(b)+1)+'-е место</div>':'')+
       '<div class="ch">'+b.chain.join(' = ')+'</div>';
     b.el.classList.add('fin');
   },900);
@@ -549,7 +566,7 @@ function showRoundResult(){
   $('ovH').textContent=boards.length>1?'Все команды справились!':'Пример решён!';
   $('ovRes').innerHTML=boards.map(function(b){
     var T=TEAMS[b.t];
-    return '<div style="--tc:'+T.c+';--tl:'+T.l+'">'+T.n+'<span>+'+(b.last||0)+' ⭐</span></div>';
+    return '<div style="--tc:'+T.c+';--tl:'+T.l+'">'+esc(teamName(b.t))+'<span>+'+pts(b.last||0)+'</span></div>';
   }).join('');
   $('ovBtn').textContent= ri<rounds.length-1 ? 'Следующий пример ▶' : 'Итоги игры ▶';
   $('ov').classList.add('on');
@@ -567,7 +584,7 @@ function showFinal(){
   $('podium').innerHTML=list.map(function(b,i){
     if(i>0 && b.score<list[i-1].score) place=i;
     var T=TEAMS[b.t];
-    return '<div style="--tc:'+T.c+';--tl:'+T.l+';animation-delay:'+(i*.15)+'s"><b>'+(medals[place]||'')+' '+T.n+'</b><span>⭐ '+b.score+'</span></div>';
+    return '<div style="--tc:'+T.c+';--tl:'+T.l+';animation-delay:'+(i*.15)+'s"><b>'+(medals[place]||'')+' '+esc(teamName(b.t))+'</b><span>'+pts(b.score)+'</span></div>';
   }).join('');
   show('final'); sWin();
 }
