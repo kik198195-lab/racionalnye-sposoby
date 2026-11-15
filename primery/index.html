@@ -154,6 +154,7 @@ html,body{background-color:#fffef8;
 .nm input{font:inherit;font-weight:800;color:var(--ink);width:min(16vw,26vh);padding:.45em .7em;border-radius:.6em;border:3px solid var(--tc);background:var(--tl);outline:none;text-align:center;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 .nm input::placeholder{color:var(--tc);opacity:.75}
 .bh .sc{white-space:nowrap}
+.one4{display:none;margin-top:1vh;background:#dff7ea;color:#169650;border:3px solid #93dcb4;border-radius:999px;padding:.4em 1.2em;font-weight:800;font-size:min(1.6vw,2.7vh)}
 /* запись — одна строка, числа немного ниже середины */
 .task{display:block!important;white-space:nowrap;overflow:hidden;text-align:center;min-height:0!important;font-size:1.45em;padding:.35em .6em .25em!important}
 .task .rl{vertical-align:.15em}
@@ -184,6 +185,7 @@ html,body{background-color:#fffef8;
   </div>
   <div class="mode" id="mode"><span>Примеры для команд:</span><button class="tog on" data-same="1">Одинаковые</button><button class="tog" data-same="0">Разные</button></div>
   <button class="tog" id="extra">＋ Добавить примеры из № 6</button>
+  <div class="one4" id="one4">1 команда: 4 примера — ученики выходят по очереди, у каждого свой пример</div>
   <div class="names" id="names"><span>Названия команд (можно не писать):</span><div class="nm" id="nmList"></div></div>
   </div>
   <button class="big" id="start">Начать игру ▶</button>
@@ -264,7 +266,7 @@ function onTap(el,fn){
     [].forEach.call(document.querySelectorAll('#tc button'),function(x){x.classList.remove('on')});
     b.classList.add('on'); nTeams=+b.getAttribute('data-n');
     $('mode').style.visibility=nTeams>1?'visible':'hidden';
-    drawNameInputs();
+    drawNameInputs(); updOne();
   });
 });
 [].forEach.call(document.querySelectorAll('#mode .tog'),function(b){
@@ -289,7 +291,9 @@ function drawNameInputs(){
 function roundFor(b){ return (sameEx||nTeams===1)?rounds[ri]:rounds[(ri+b.t)%rounds.length]; }
 $('extra').addEventListener('click',function(){ useExtra=!useExtra; this.classList.toggle('on',useExtra); this.textContent=(useExtra?'✓ ':'＋ ')+'Добавить примеры из № 6'; });
 $('start').addEventListener('click',startGame);
-drawNameInputs();
+function updOne(){ var e=$('one4'); if(!e) return; e.style.display=nTeams===1?'inline-block':'none'; e.textContent='1 команда: '+(useExtra?'7 примеров':'4 примера')+' — ученики выходят по очереди, у каждого свой пример'; }
+drawNameInputs(); updOne();
+$('extra').addEventListener('click',updOne);
 $('again').addEventListener('click',startGame);
 [].forEach.call(document.querySelectorAll('[data-fs]'),function(b){ b.addEventListener('click',toggleFS); });
 function toggleFS(){
